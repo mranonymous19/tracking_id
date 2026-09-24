@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Upload Tracking Sheet</title>
+<style>
+  :root{
+    --paper:#F7F7F4;
+    --ink:#1C1C1E;
+    --ink-soft:#5B5B57;
+    --line:#DEDDD6;
+    --postal:#2851A3;
+    --postal-dark:#1D3C7C;
+    --stamp:#B8402A;
+    --stamp-bg:#F7E9E4;
+    --ok:#3A7D5C;
+    --ok-bg:#E7F1EA;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px 20px;
+  }
+  .card{
+    width:100%;
+    max-width:440px;
+    border:1px solid var(--line);
+    background:#fff;
+    border-radius:2px;
+    padding:32px 28px 28px;
+    position:relative;
+  }
+  .card::before{
+    content:"";
+    position:absolute;
+    top:0; left:0; right:0;
+    height:4px;
+    background:repeating-linear-gradient(90deg,var(--postal) 0 14px, transparent 14px 22px);
+  }
+  h1{
+    font-size:20px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+    margin:8px 0 4px;
+  }
+  .sub{
+    color:var(--ink-soft);
+    font-size:14px;
+    line-height:1.5;
+    margin:0 0 24px;
+  }
+  .dropzone{
+    border:1.5px dashed var(--line);
+    border-radius:2px;
+    padding:28px 16px;
+    text-align:center;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .dropzone:hover, .dropzone.drag{
+    border-color:var(--postal);
+    background:#F4F7FC;
+  }
+  .dropzone svg{ margin-bottom:10px; }
+  .dz-label{ font-size:14px; font-weight:600; }
+  .dz-hint{ font-size:12.5px; color:var(--ink-soft); margin-top:4px; }
+  input[type=file]{ display:none; }
+  .file-info{
+    display:none;
+    margin-top:14px;
+    padding:10px 12px;
+    background:#F4F4F1;
+    border-radius:2px;
+    font-family:"SF Mono",ui-monospace,Menlo,monospace;
+    font-size:12.5px;
+    color:var(--ink);
+    word-break:break-all;
+  }
+  details{ margin-top:18px; }
+  summary{
+    font-size:13px;
+    color:var(--ink-soft);
+    cursor:pointer;
+    user-select:none;
+  }
+  summary:hover{ color:var(--ink); }
+  .settings-body{ margin-top:10px; }
+  label.field-label{
+    display:block;
+    font-size:12.5px;
+    color:var(--ink-soft);
+    margin-bottom:5px;
+  }
+  input[type=text]{
+    width:100%;
+    padding:9px 10px;
+    border:1px solid var(--line);
+    border-radius:2px;
+    font-size:13px;
+    font-family:"SF Mono",ui-monospace,Menlo,monospace;
+    color:var(--ink);
+  }
+  input[type=text]:focus{ outline:2px solid var(--postal); outline-offset:1px; border-color:var(--postal); }
+  button{
+    width:100%;
+    margin-top:20px;
+    padding:12px;
+    background:var(--postal);
+    color:#fff;
+    border:none;
+    border-radius:2px;
+    font-size:14.5px;
+    font-weight:600;
+    cursor:pointer;
+    transition:background .15s ease;
+  }
+  button:hover:not(:disabled){ background:var(--postal-dark); }
+  button:disabled{ background:#C7C7C2; cursor:not-allowed; }
+  .status{
+    display:none;
+    margin-top:14px;
+    padding:10px 12px;
+    border-radius:2px;
+    font-size:13px;
+    line-height:1.5;
+  }
+  .status.ok{ display:block; background:var(--ok-bg); color:var(--ok); }
+  .status.err{ display:block; background:var(--stamp-bg); color:var(--stamp); }
+  .status.pending{ display:block; background:#F4F4F1; color:var(--ink-soft); }
+  :root:not([data-theme="light"]) { color-scheme: light; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Upload tracking sheet</h1>
+  <p class="sub">Drop the Excel file with Order ID, Tracking Number and Courier Name. Matching orders get marked fulfilled and the customer is notified.</p>
+
+  <div class="dropzone" id="dropzone">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5B5B57" stroke-width="1.6"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+    <div class="dz-label">Click to choose, or drag a file here</div>
+    <div class="dz-hint">.xlsx, .xls or .csv</div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+  </div>
+  <div class="file-info" id="fileInfo"></div>
+
+  <details id="settings">
+    <summary>Webhook settings</summary>
+    <div class="settings-body">
+      <label class="field-label" for="webhookUrl">n8n webhook URL</label>
+      <input type="text" id="webhookUrl" placeholder="https://your-n8n-host/webhook/bulk-tracking-upload">
+    </div>
+  </details>
+
+  <button id="uploadBtn" disabled>Upload sheet</button>
+  <div class="status" id="status"></div>
+</div>
+
+<script>
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const fileInfo = document.getElementById('fileInfo');
+  const uploadBtn = document.getElementById('uploadBtn');
+  const statusEl = document.getElementById('status');
+  const webhookInput = document.getElementById('webhookUrl');
+  const settings = document.getElementById('settings');
+
+  let selectedFile = null;
+
+  try {
+    const saved = localStorage.getItem('trackingWebhookUrl');
+    if (saved) { webhookInput.value = saved; } else { settings.open = true; }
+  } catch (e) { settings.open = true; }
+
+  function humanSize(bytes){
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB';
+    return (bytes/1024/1024).toFixed(1) + ' MB';
+  }
+
+  function setFile(file){
+    selectedFile = file;
+    fileInfo.style.display = 'block';
+    fileInfo.textContent = file.name + '  ·  ' + humanSize(file.size);
+    updateButton();
+  }
+
+  function updateButton(){
+    uploadBtn.disabled = !(selectedFile && webhookInput.value.trim());
+  }
+
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) setFile(fileInput.files[0]);
+  });
+
+  ['dragenter','dragover'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('drag'); })
+  );
+  ['dragleave','drop'].forEach(evt =>
+    dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('drag'); })
+  );
+  dropzone.addEventListener('drop', e => {
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+
+  webhookInput.addEventListener('input', () => {
+    try { localStorage.setItem('trackingWebhookUrl', webhookInput.value.trim()); } catch(e){}
+    updateButton();
+  });
+
+  uploadBtn.addEventListener('click', async () => {
+    if (!selectedFile || !webhookInput.value.trim()) return;
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = 'Uploading…';
+    statusEl.className = 'status pending';
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Sending file…';
+
+    const formData = new FormData();
+    formData.append('file', selectedFile, selectedFile.name);
+
+    try {
+      const res = await fetch(webhookInput.value.trim(), { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('Server responded with ' + res.status);
+      statusEl.className = 'status ok';
+      statusEl.textContent = 'Received. The workflow is now processing each order — watch Telegram for progress and any skipped rows.';
+    } catch (err) {
+      statusEl.className = 'status err';
+      statusEl.textContent = 'Upload failed: ' + err.message + '. Check the webhook URL and that the workflow is active.';
+    } finally {
+      uploadBtn.textContent = 'Upload sheet';
+      updateButton();
+    }
+  });
+</script>
+</body>
+</html>
